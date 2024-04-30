@@ -95,6 +95,9 @@ fn main() {
             if compiler.is_like_clang() || compiler.is_like_gnu() {
                 build.flag("-pthread");
 
+                build.flag("-march=native");
+                build.flag("-mtune=native");
+
                 if features.avx {
                     build.flag("-mavx");
                 }
