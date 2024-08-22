@@ -20,8 +20,8 @@ use llama_cpp_2::ggml_time_us;
 use llama_cpp_2::llama_backend::LlamaBackend;
 use llama_cpp_2::llama_batch::LlamaBatch;
 use llama_cpp_2::model::params::LlamaModelParams;
-use llama_cpp_2::model::{AddBos, Special};
 use llama_cpp_2::model::LlamaModel;
+use llama_cpp_2::model::{AddBos, Special};
 
 #[derive(clap::Parser, Debug, Clone)]
 struct Args {
@@ -35,7 +35,7 @@ struct Args {
     #[clap(short)]
     normalise: bool,
     /// Disable offloading layers to the gpu
-    #[cfg(feature = "cublas")]
+    #[cfg(any(feature = "cuda", feature = "vulkan"))]
     #[clap(long)]
     disable_gpu: bool,
 }
@@ -78,7 +78,7 @@ fn main() -> Result<()> {
         model,
         prompt,
         normalise,
-        #[cfg(feature = "cublas")]
+        #[cfg(any(feature = "cuda", feature = "vulkan"))]
         disable_gpu,
     } = Args::parse();
 
@@ -87,13 +87,13 @@ fn main() -> Result<()> {
 
     // offload all layers to the gpu
     let model_params = {
-        #[cfg(feature = "cublas")]
+        #[cfg(any(feature = "cuda", feature = "vulkan"))]
         if !disable_gpu {
             LlamaModelParams::default().with_n_gpu_layers(1000)
         } else {
             LlamaModelParams::default()
         }
-        #[cfg(not(feature = "cublas"))]
+        #[cfg(not(any(feature = "cuda", feature = "vulkan")))]
         LlamaModelParams::default()
     };
 
@@ -139,10 +139,10 @@ fn main() -> Result<()> {
         for token in token_line {
             // Attempt to convert token to string and print it; if it fails, print the token instead
             match model.token_to_str(*token, Special::Tokenize) {
-                Ok(token_str) => eprintln!(" {} --> {}", token, token_str),
+                Ok(token_str) => eprintln!("{token} --> {token_str}"),
                 Err(e) => {
-                    eprintln!("Failed to convert token to string, error: {}", e);
-                    eprintln!("Token value: {}", token);
+                    eprintln!("Failed to convert token to string, error: {e}");
+                    eprintln!("Token value: {token}");
                 }
             }
         }

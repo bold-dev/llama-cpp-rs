@@ -15,8 +15,8 @@ use llama_cpp_2::llama_backend::LlamaBackend;
 use llama_cpp_2::llama_batch::LlamaBatch;
 use llama_cpp_2::model::params::kv_overrides::ParamOverrideValue;
 use llama_cpp_2::model::params::LlamaModelParams;
-use llama_cpp_2::model::{AddBos, Special};
 use llama_cpp_2::model::LlamaModel;
+use llama_cpp_2::model::{AddBos, Special};
 use llama_cpp_2::token::data_array::LlamaTokenDataArray;
 use std::ffi::CString;
 use std::io::Write;
@@ -44,7 +44,7 @@ struct Args {
     #[arg(short = 'o', value_parser = parse_key_val)]
     key_value_overrides: Vec<(String, ParamOverrideValue)>,
     /// Disable offloading layers to the gpu
-    #[cfg(feature = "cublas")]
+    #[cfg(any(feature = "cuda", feature = "vulkan"))]
     #[clap(long)]
     disable_gpu: bool,
     #[arg(short = 's', long, help = "RNG seed (default: 1234)")]
@@ -117,13 +117,14 @@ impl Model {
     }
 }
 
+#[allow(clippy::too_many_lines)]
 fn main() -> Result<()> {
     let Args {
         n_len,
         model,
         prompt,
         file,
-        #[cfg(feature = "cublas")]
+        #[cfg(any(feature = "cuda", feature = "vulkan"))]
         disable_gpu,
         key_value_overrides,
         seed,
@@ -137,13 +138,13 @@ fn main() -> Result<()> {
 
     // offload all layers to the gpu
     let model_params = {
-        #[cfg(feature = "cublas")]
+        #[cfg(any(feature = "cuda", feature = "vulkan"))]
         if !disable_gpu {
             LlamaModelParams::default().with_n_gpu_layers(1000)
         } else {
             LlamaModelParams::default()
         }
-        #[cfg(not(feature = "cublas"))]
+        #[cfg(not(any(feature = "cuda", feature = "vulkan")))]
         LlamaModelParams::default()
     };
 
@@ -263,7 +264,7 @@ either reduce n_len or increase n_ctx"
             // use `Decoder.decode_to_string()` to avoid the intermediate buffer
             let mut output_string = String::with_capacity(32);
             let _decode_result = decoder.decode_to_string(&output_bytes, &mut output_string, false);
-            print!("{}", output_string);
+            print!("{output_string}");
             std::io::stdout().flush()?;
 
             batch.clear();

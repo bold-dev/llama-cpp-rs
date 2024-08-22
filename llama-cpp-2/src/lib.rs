@@ -11,7 +11,7 @@
 //!
 //! # Feature Flags
 //!
-//! - `cublas` enables CUDA gpu support.
+//! - `cuda` enables CUDA gpu support.
 //! - `sampler` adds the [`context::sample::sampler`] struct for a more rusty way of sampling.
 use std::ffi::NulError;
 use std::fmt::Debug;
@@ -47,6 +47,9 @@ pub enum LLamaCppError {
     /// There was an error while decoding a batch.
     #[error("{0}")]
     DecodeError(#[from] DecodeError),
+    /// There was an error while encoding a batch.
+    #[error("{0}")]
+    EncodeError(#[from] EncodeError),
     /// There was an error loading a model.
     #[error("{0}")]
     LlamaModelLoadError(#[from] LlamaModelLoadError),
@@ -64,6 +67,9 @@ pub enum LLamaCppError {
 /// There was an error while getting the chat template from a model.
 #[derive(Debug, Eq, PartialEq, thiserror::Error)]
 pub enum ChatTemplateError {
+    /// the buffer was too small.
+    #[error("The buffer was too small. However, a buffer size of {0} would be just large enough.")]
+    BuffSizeError(usize),
     /// gguf has no chat template
     #[error("the model has no meta val - returned code {0}")]
     MissingTemplate(i32),
@@ -94,6 +100,20 @@ pub enum DecodeError {
     Unknown(c_int),
 }
 
+/// Failed to decode a batch.
+#[derive(Debug, Eq, PartialEq, thiserror::Error)]
+pub enum EncodeError {
+    /// No kv cache slot was available.
+    #[error("Encode Error 1: NoKvCacheSlot")]
+    NoKvCacheSlot,
+    /// The number of tokens in the batch was 0.
+    #[error("Encode Error -1: n_tokens == 0")]
+    NTokensZero,
+    /// An unknown error occurred.
+    #[error("Encode Error {0}: unknown")]
+    Unknown(c_int),
+}
+
 /// When embedding related functions fail
 #[derive(Debug, Eq, PartialEq, thiserror::Error)]
 pub enum EmbeddingsError {
@@ -119,6 +139,17 @@ impl From<NonZeroI32> for DecodeError {
     }
 }
 
+/// Encode a error from llama.cpp into a [`EncodeError`].
+impl From<NonZeroI32> for EncodeError {
+    fn from(value: NonZeroI32) -> Self {
+        match value.get() {
+            1 => EncodeError::NoKvCacheSlot,
+            -1 => EncodeError::NTokensZero,
+            i => EncodeError::Unknown(i),
+        }
+    }
+}
+
 /// An error that can occur when loading a model.
 #[derive(Debug, Eq, PartialEq, thiserror::Error)]
 pub enum LlamaModelLoadError {
@@ -131,6 +162,36 @@ pub enum LlamaModelLoadError {
     /// Failed to convert the path to a rust str. This means the path was not valid unicode
     #[error("failed to convert path {0} to str")]
     PathToStrError(PathBuf),
+}
+
+/// An error that can occur when loading a model.
+#[derive(Debug, Eq, PartialEq, thiserror::Error)]
+pub enum LlamaLoraAdapterInitError {
+    /// There was a null byte in a provided string and thus it could not be converted to a C string.
+    #[error("null byte in string {0}")]
+    NullError(#[from] NulError),
+    /// llama.cpp returned a nullptr - this could be many different causes.
+    #[error("null result from llama cpp")]
+    NullResult,
+    /// Failed to convert the path to a rust str. This means the path was not valid unicode
+    #[error("failed to convert path {0} to str")]
+    PathToStrError(PathBuf),
+}
+
+/// An error that can occur when loading a model.
+#[derive(Debug, Eq, PartialEq, thiserror::Error)]
+pub enum LlamaLoraAdapterSetError {
+    /// llama.cpp returned a non-zero error code.
+    #[error("error code from llama cpp")]
+    ErrorResult(i32),
+}
+
+/// An error that can occur when loading a model.
+#[derive(Debug, Eq, PartialEq, thiserror::Error)]
+pub enum LlamaLoraAdapterRemoveError {
+    /// llama.cpp returned a non-zero error code.
+    #[error("error code from llama cpp")]
+    ErrorResult(i32),
 }
 
 /// get the time (in microseconds) according to llama.cpp
@@ -203,7 +264,7 @@ pub enum StringToTokenError {
     #[error("{0}")]
     NulError(#[from] NulError),
     #[error("{0}")]
-    /// Failed to convert a provided integer to a c_int.
+    /// Failed to convert a provided integer to a [`c_int`].
     CIntConversionError(#[from] std::num::TryFromIntError),
 }
 
