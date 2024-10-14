@@ -41,6 +41,49 @@ impl From<RopeScalingType> for i32 {
     }
 }
 
+/// A rusty wrapper around `LLAMA_POOLING_TYPE`.
+#[repr(i8)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum LlamaPoolingType {
+    /// The pooling type is unspecified
+    Unspecified = -1,
+    /// No pooling    
+    None = 0,
+    /// Mean pooling
+    Mean = 1,
+    /// CLS pooling
+    Cls = 2,
+    /// Last pooling
+    Last = 3,
+}
+
+/// Create a `LlamaPoolingType` from a `c_int` - returns `LlamaPoolingType::Unspecified` if
+/// the value is not recognized.
+impl From<i32> for LlamaPoolingType {
+    fn from(value: i32) -> Self {
+        match value {
+            0 => Self::None,
+            1 => Self::Mean,
+            2 => Self::Cls,
+            3 => Self::Last,
+            _ => Self::Unspecified,
+        }
+    }
+}
+
+/// Create a `c_int` from a `LlamaPoolingType`.
+impl From<LlamaPoolingType> for i32 {
+    fn from(value: LlamaPoolingType) -> Self {
+        match value {
+            LlamaPoolingType::None => 0,
+            LlamaPoolingType::Mean => 1,
+            LlamaPoolingType::Cls => 2,
+            LlamaPoolingType::Last => 3,
+            LlamaPoolingType::Unspecified => -1,
+        }
+    }
+}
+
 /// A safe wrapper around `llama_context_params`.
 ///
 /// Generally this should be created with [`Default::default()`] and then modified with `with_*` methods.
@@ -166,6 +209,97 @@ impl LlamaContextParams {
         self.context_params.n_batch
     }
 
+    /// Set the `n_ubatch`
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # use std::num::NonZeroU32;
+    /// use llama_cpp_2::context::params::LlamaContextParams;
+    /// let params = LlamaContextParams::default()
+    ///     .with_n_ubatch(512);
+    /// assert_eq!(params.n_ubatch(), 512);
+    /// ```
+    #[must_use]
+    pub fn with_n_ubatch(mut self, n_ubatch: u32) -> Self {
+        self.context_params.n_ubatch = n_ubatch;
+        self
+    }
+
+    /// Get the `n_ubatch`
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use llama_cpp_2::context::params::LlamaContextParams;
+    /// let params = LlamaContextParams::default();
+    /// assert_eq!(params.n_ubatch(), 512);
+    /// ```
+    #[must_use]
+    pub fn n_ubatch(&self) -> u32 {
+        self.context_params.n_ubatch
+    }
+
+    /// Set the `flash_attention` parameter
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use llama_cpp_2::context::params::LlamaContextParams;
+    /// let params = LlamaContextParams::default()
+    ///     .with_flash_attention(true);
+    /// assert_eq!(params.flash_attention(), true);
+    /// ```
+    #[must_use]
+    pub fn with_flash_attention(mut self, enabled: bool) -> Self {
+        self.context_params.flash_attn = enabled;
+        self
+    }
+
+    /// Get the `flash_attention` parameter
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use llama_cpp_2::context::params::LlamaContextParams;
+    /// let params = LlamaContextParams::default();
+    /// assert_eq!(params.flash_attention(), false);
+    /// ```
+    #[must_use]
+    pub fn flash_attention(&self) -> bool {
+        self.context_params.flash_attn
+    }
+
+    /// Set the `offload_kqv` parameter to control offloading KV cache & KQV ops to GPU
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use llama_cpp_2::context::params::LlamaContextParams;
+    /// let params = LlamaContextParams::default()
+    ///     .with_offload_kqv(false);
+    /// assert_eq!(params.offload_kqv(), false);
+    /// ```
+    #[must_use]
+    pub fn with_offload_kqv(mut self, enabled: bool) -> Self {
+        self.context_params.offload_kqv = enabled;
+        self
+    }
+
+    /// Get the `offload_kqv` parameter
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use llama_cpp_2::context::params::LlamaContextParams;
+    /// let params = LlamaContextParams::default();
+    /// assert_eq!(params.offload_kqv(), true);
+    /// ```
+    #[must_use]
+    pub fn offload_kqv(&self) -> bool {
+        self.context_params.offload_kqv
+    }
+
     /// Set the type of rope scaling.
     ///
     /// # Examples
@@ -262,7 +396,7 @@ impl LlamaContextParams {
     /// assert_eq!(params.n_threads(), 4);
     /// ```
     #[must_use]
-    pub fn n_threads(&self) -> u32 {
+    pub fn n_threads(&self) -> i32 {
         self.context_params.n_threads
     }
 
@@ -275,7 +409,7 @@ impl LlamaContextParams {
     /// assert_eq!(params.n_threads_batch(), 4);
     /// ```
     #[must_use]
-    pub fn n_threads_batch(&self) -> u32 {
+    pub fn n_threads_batch(&self) -> i32 {
         self.context_params.n_threads_batch
     }
 
@@ -290,7 +424,7 @@ impl LlamaContextParams {
     /// assert_eq!(params.n_threads(), 8);
     /// ```
     #[must_use]
-    pub fn with_n_threads(mut self, n_threads: u32) -> Self {
+    pub fn with_n_threads(mut self, n_threads: i32) -> Self {
         self.context_params.n_threads = n_threads;
         self
     }
@@ -306,7 +440,7 @@ impl LlamaContextParams {
     /// assert_eq!(params.n_threads_batch(), 8);
     /// ```
     #[must_use]
-    pub fn with_n_threads_batch(mut self, n_threads: u32) -> Self {
+    pub fn with_n_threads_batch(mut self, n_threads: i32) -> Self {
         self.context_params.n_threads_batch = n_threads;
         self
     }
@@ -354,9 +488,9 @@ impl LlamaContextParams {
     /// }
     ///
     /// use llama_cpp_2::context::params::LlamaContextParams;
-    /// let params = LlamaContextParams::default();
-    /// params.with_cb_eval(Some(cb_eval_fn));
+    /// let params = LlamaContextParams::default().with_cb_eval(Some(cb_eval_fn));
     /// ```
+    #[must_use]
     pub fn with_cb_eval(
         mut self,
         cb_eval: llama_cpp_sys_2::ggml_backend_sched_eval_callback,
@@ -373,11 +507,41 @@ impl LlamaContextParams {
     /// use llama_cpp_2::context::params::LlamaContextParams;
     /// let params = LlamaContextParams::default();
     /// let user_data = std::ptr::null_mut();
-    /// params.with_cb_eval_user_data(user_data);
+    /// let params = params.with_cb_eval_user_data(user_data);
     /// ```
+    #[must_use]
     pub fn with_cb_eval_user_data(mut self, cb_eval_user_data: *mut std::ffi::c_void) -> Self {
         self.context_params.cb_eval_user_data = cb_eval_user_data;
         self
+    }
+
+    /// Set the type of pooling.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use llama_cpp_2::context::params::{LlamaContextParams, LlamaPoolingType};
+    /// let params = LlamaContextParams::default()
+    ///     .with_pooling_type(LlamaPoolingType::Last);
+    /// assert_eq!(params.pooling_type(), LlamaPoolingType::Last);
+    /// ```
+    #[must_use]
+    pub fn with_pooling_type(mut self, pooling_type: LlamaPoolingType) -> Self {
+        self.context_params.pooling_type = i32::from(pooling_type);
+        self
+    }
+
+    /// Get the type of pooling.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// let params = llama_cpp_2::context::params::LlamaContextParams::default();
+    /// assert_eq!(params.pooling_type(), llama_cpp_2::context::params::LlamaPoolingType::Unspecified);
+    /// ```
+    #[must_use]
+    pub fn pooling_type(&self) -> LlamaPoolingType {
+        LlamaPoolingType::from(self.context_params.pooling_type)
     }
 }
 

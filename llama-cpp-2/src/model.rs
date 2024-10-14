@@ -1,6 +1,6 @@
 //! A safe wrapper around `llama_model`.
-use std::ffi::CString;
 use std::ffi::CStr;
+use std::ffi::CString;
 use std::num::NonZeroU16;
 use std::os::raw::c_int;
 use std::path::Path;
@@ -122,6 +122,12 @@ impl LlamaModel {
     pub fn token_nl(&self) -> LlamaToken {
         let token = unsafe { llama_cpp_sys_2::llama_token_nl(self.model.as_ptr()) };
         LlamaToken(token)
+    }
+
+    /// Check if a token represents the end of generation (end of turn, end of sequence, etc.)
+    #[must_use]
+    pub fn is_eog_token(&self, token: LlamaToken) -> bool {
+        unsafe { llama_cpp_sys_2::llama_token_is_eog(self.model.as_ptr(), token.0) }
     }
 
     /// Get the decoder start token token.
@@ -339,7 +345,7 @@ impl LlamaModel {
         let len = string.as_bytes().len();
         let len = c_int::try_from(len).expect("length fits into c_int");
         let buf = string.into_raw();
-        let lstrip = lstrip.map(|it| i32::from(it.get())).unwrap_or(0);
+        let lstrip = lstrip.map_or(0, |it| i32::from(it.get()));
         let size = unsafe {
             llama_cpp_sys_2::llama_token_to_piece(
                 self.model.as_ptr(),
@@ -523,7 +529,7 @@ impl LlamaModel {
         let message_length = chat.iter().fold(0, |acc, c| {
             acc + c.role.to_bytes().len() + c.content.to_bytes().len()
         });
-        let mut buff: Vec<i8> = vec![0_i8; message_length * 4];
+        let mut buff = vec![0; message_length * 4];
 
         // Build our llama_cpp_sys_2 chat messages
         let chat: Vec<llama_cpp_sys_2::llama_chat_message> = chat
@@ -548,7 +554,7 @@ impl LlamaModel {
                 chat.as_ptr(),
                 chat.len(),
                 add_ass,
-                buff.as_mut_ptr().cast::<std::os::raw::c_char>(),
+                buff.as_mut_ptr(),
                 buff.len() as i32,
             );
             // A buffer twice the size should be sufficient for all models, if this is not the case for a new model, we can increase it
@@ -556,7 +562,11 @@ impl LlamaModel {
             if res > buff.len() as i32 {
                 return Err(ApplyChatTemplateError::BuffSizeError);
             }
-            Ok::<String, ApplyChatTemplateError>(CStr::from_ptr(buff.as_mut_ptr()).to_string_lossy().to_string())
+            Ok::<String, ApplyChatTemplateError>(
+                CStr::from_ptr(buff.as_mut_ptr())
+                    .to_string_lossy()
+                    .to_string(),
+            )
         }?;
         Ok(formatted_chat)
     }

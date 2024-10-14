@@ -54,12 +54,12 @@ struct Args {
         long,
         help = "number of threads to use during generation (default: use all available threads)"
     )]
-    threads: Option<u32>,
+    threads: Option<i32>,
     #[arg(
         long,
         help = "number of threads to use during batch and prompt processing (default: use all available threads)"
     )]
-    threads_batch: Option<u32>,
+    threads_batch: Option<i32>,
     #[arg(
         short = 'c',
         long,
@@ -247,7 +247,7 @@ either reduce n_len or increase n_ctx"
     while n_cur <= n_len {
         // sample the next token
         {
-            let candidates = ctx.candidates_ith(batch.n_tokens() - 1);
+            let candidates = ctx.candidates();
 
             let candidates_p = LlamaTokenDataArray::from_iter(candidates, false);
 
@@ -255,7 +255,7 @@ either reduce n_len or increase n_ctx"
             let new_token_id = ctx.sample_token_greedy(candidates_p);
 
             // is it an end of stream?
-            if new_token_id == model.token_eos() {
+            if model.is_eog_token(new_token_id) {
                 eprintln!();
                 break;
             }
