@@ -288,7 +288,7 @@ fn main() {
     if cfg!(feature = "openmp") {
         if cfg!(target_os = "macos") && target.contains("gnu") && !target.contains("windows-gnu") {
             println!("cargo:rustc-link-lib=gomp");
-        } else if target.contains("gnu") {
+        } else if !cfg!(target_os = "macos") && target.contains("gnu") {
             println!("cargo:rustc-link-lib=gomp");
         }
     }
