@@ -286,7 +286,7 @@ fn main() {
 
     // OpenMP
     if cfg!(feature = "openmp") {
-        if target.contains("gnu") && !target.contains("windows-gnu") {
+        if target.contains("gnu") {
             println!("cargo:rustc-link-lib=gomp");
         }
     }
