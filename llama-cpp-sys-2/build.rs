@@ -286,7 +286,7 @@ fn main() {
 
     // OpenMP
     if cfg!(feature = "openmp") {
-        if target.contains("gnu") {
+        if target.contains("gnu") && !target.contains("windows-gnu") {
             println!("cargo:rustc-link-lib=gomp");
         }
     }
@@ -297,7 +297,7 @@ fn main() {
     }
 
     // // macOS
-    if cfg!(target_os = "macos") {
+    if cfg!(target_os = "macos") && !target.contains("windows-gnu") {
         println!("cargo:rustc-link-lib=framework=Foundation");
         println!("cargo:rustc-link-lib=framework=Metal");
         println!("cargo:rustc-link-lib=framework=MetalKit");
